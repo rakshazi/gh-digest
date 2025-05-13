@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
-      - run: pip install --break-system-packages requests python-dotenv markdown
+      - run: pip install --break-system-packages -r requirements.txt
       - name: Run digest script
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
