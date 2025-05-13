@@ -128,7 +128,7 @@ def mark_as_read(thread_ids):
 
 def build_digest_grouped(notifs):
     if not notifs:
-        return None
+        return None, None
 
     # 1. Sort notifications by newest first
     notifs_sorted = sorted(notifs, key=lambda n: n.get('updated_at', ''), reverse=True)
