@@ -80,6 +80,25 @@ REASON_TO_TEXT = {
     "team_mention": "you were on a team that was mentioned",
     "Default": "you received a notification about this thread",
 }
+# mapping of reason types to emojis
+REASON_TO_EMOJI = {
+    "approval_requested": "👀",
+    "assign": "👤",
+    "author": "✍️",
+    "comment": "💬",
+    "ci_activity": "🔄",
+    "invitation": "📩",
+    "manual": "🔔",
+    "member_feature_requested": "🛠️",
+    "mention": "🔔",
+    "review_requested": "👀",
+    "security_alert": "🚨",
+    "security_advisory_credit": "🛡️",
+    "state_change": "🔄",
+    "subscribed": "🔔",
+    "team_mention": "👥",
+    "Default": "",
+}
 
 
 def emoji_for(notification_type):
@@ -90,6 +109,9 @@ def text_for(notification_type):
 
 def reason_for(reason):
     return REASON_TO_TEXT.get(reason, REASON_TO_TEXT["Default"])
+
+def reason_emoji_for(reason):
+    return REASON_TO_EMOJI.get(reason, REASON_TO_EMOJI["Default"])
 
 
 def fetch_notifications():
@@ -181,7 +203,7 @@ def build_digest_grouped(notifs):
 
             # Compose the notification line
             notif_line = f"""### [{emoji_for(notif_type)} {title}]({web_url})"""
-            notif_line += f"\n_You have received this notification about the new {text_for(notif_type)} because {reason_for(reason)}._\n"
+            notif_line += f"\n_you have received this notification about the {emoji_for(notif_type)} {text_for(notif_type)} because {reason_emoji_for(reason)} {reason_for(reason)}._\n"
             if snippet:
                 notif_line += f"\n\n{snippet.strip()}\n"
             lines.append(notif_line)
