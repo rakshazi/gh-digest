@@ -12,7 +12,7 @@ load_dotenv()
 GITHUB_API = "https://api.github.com/notifications"
 TOKEN = os.environ['GH_TOKEN']
 SMTP_SERVER = os.environ['SMTP_HOST']
-SMTP_PORT = os.environ['SMTP_PORT']
+SMTP_PORT = int(os.environ['SMTP_PORT'])
 SMTP_USER = os.environ['SMTP_USER']
 SMTP_PASS = os.environ['SMTP_PASS']
 MAIL_TO = os.environ['MAIL_TO']
@@ -122,23 +122,17 @@ def fetch_notifications():
     r = requests.get(GITHUB_API, headers=headers)
     match(r.status_code):
         case 401:
-            print("❌ Invalid GitHub token. Please check the configuration")
-            os.exit(1)
+            raise ValueError("Invalid GitHub token. Please check the configuration")
         case 403:
-            print("❌ GitHub API rate limit exceeded. Please try again later.")
-            os.exit(1)
+            raise ValueError("GitHub API rate limit exceeded. Please try again later.")
         case 200:
             return r.json()
         case 404:
-            print("❌ GitHub API endpoint not found. Please check the URL.")
-            os.exit(1)
+            raise ValueError("GitHub API endpoint not found. Please check the URL.")
         case 503:
-            print("❌ GitHub API service unavailable. Please try again later.")
-            os.exit(1)
+            raise ValueError("GitHub API service unavailable. Please try again later.")
         case _:
-            print(f"❌ Unexpected error: {r.status_code}")
-            os.exit(1)
-    return r.json()
+            raise ValueError(f"Unexpected error: {r.status_code}. Please check the configuration or GitHub status.")
 
 def mark_as_read(thread_ids):
     headers = {
@@ -199,6 +193,7 @@ def build_digest_grouped(notifs):
                     if c.ok:
                         snippet = c.json().get('body', '')
                 except Exception:
+                    print(f"❌ Failed to fetch comment snippet for {web_url}. Ignoring...")
                     pass
 
             # Compose the notification line
@@ -220,39 +215,53 @@ def send_mail(digest_text, digest_lines):
     msg['To'] = MAIL_TO
     msg.set_content(digest_text)
     html = ""
+    # each line is converted separately, because notification itself may contain markdown,
+    # and converting the whole digest at once would break the markdown formatting
     for line in digest_lines:
         html += markdown.markdown(line)
     msg.add_alternative(html, subtype="html")
 
-    try:
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=60) as server:
-            server.login(SMTP_USER, SMTP_PASS)
-            server.send_message(msg)
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-        os.exit(1)
+    with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=60) as server:
+        server.login(SMTP_USER, SMTP_PASS)
+        server.send_message(msg)
 
 def main():
     print("🔄 Fetching notifications...")
-    notifications = fetch_notifications()
+    try:
+        notifications = fetch_notifications()
+    except Exception as e:
+        print(f"❌ Cannot fetch notifications: {e}")
+        return
 
     # Mark as read IDs (done at the end IF email sending succeeds)
     thread_ids = [n['id'] for n in notifications]
 
     print(f"📝 Building digest from {len(notifications)} notifications...")
-    digest, lines = build_digest_grouped(notifications)
-    if not digest:
-        print("🎉 No unread notifications!")
+    try:
+        digest, lines = build_digest_grouped(notifications)
+        if not digest:
+            print("🎉 No unread notifications!")
+            return
+    except Exception as e:
+        print(f"❌ Failed to build digest: {e}")
         return
 
     print("📧 Sending email...")
-    send_mail(digest, lines)
-    print("✅ Email sent!")
+    try:
+        send_mail(digest, lines)
+        print("✅ Email sent!")
+    except Exception as e:
+        print(f"❌ Failed to send email: {e}")
+        return
 
     print("✅ Marking notifications as read...")
-    if thread_ids:
-        mark_as_read(thread_ids)
-    print("✅ Marked notifications as read!")
+    try:
+        if thread_ids:
+            mark_as_read(thread_ids)
+        print("✅ Marked notifications as read!")
+    except Exception as e:
+        print(f"❌ Failed to mark notifications as read: {e}")
+        return
 
 if __name__ == "__main__":
     main()
